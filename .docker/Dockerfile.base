@@ -1,5 +1,5 @@
 # Sets the base image for subsequent instructions
-FROM library/ubuntu:22.04 AS builder
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
 
 # Sets labels for the image
 LABEL org.opencontainers.image.source="https://github.com/ypilseong/LectureSync-container"
@@ -13,6 +13,7 @@ RUN apt-get update --fix-missing \
     && apt-get install -y curl wget jq sudo gosu git build-essential software-properties-common \
     locales locales-all fontconfig fonts-nanum \
     tzdata openssh-server \
+    python3-pip python3-venv \
     # Cleans up unnecessary packages to reduce image size
     && apt-get autoremove -y \
     && apt-get clean -y
@@ -40,7 +41,8 @@ RUN mkdir -p $WORKSPACE_ROOT/projects
 WORKDIR $WORKSPACE_ROOT
 # Copies scripts from host into the image
 COPY ./.docker/scripts/ ./scripts/
-# RUN pip install -r ./scripts/requirements-base.txt
+# Copies requirements.txt from host into the image
+COPY requirements.txt .
 
 # Sets the time zone within the container
 ENV TZ="Asia/Seoul"
@@ -100,6 +102,14 @@ ENV REMOTE_CONTAINERS=1
 RUN sh -c "$(wget -qO- https://dotfiles.entelecheia.ai/install)"
 USER root
 
+# Install Python dependencies
+# Install Python dependencies in the cloned repository
+RUN cd projects/ \
+    && git clone https://github.com/ypilseong/LectureSync.git
+
+RUN python3 -m venv $WORKSPACE_ROOT/projects/LectureSync/venv \
+    && $WORKSPACE_ROOT/projects/LectureSync/venv/bin/pip install --upgrade pip \
+    && $WORKSPACE_ROOT/projects/LectureSync/venv/bin/pip install -r requirements.txt
 
 # Copies entrypoint script from host into the image
 COPY ./.docker/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
